@@ -62,12 +62,18 @@ const Dashboard = () => {
   const filteredDocuments = documents.filter((doc) =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   // Stats Logic
   const totalDocs = documents.length;
-  const totalSize = documents.reduce((acc, doc) => acc + (doc.size || 0), 0);
-  const imageDocs = documents.filter((doc) =>
-    doc.fileType.startsWith("image")
+
+  // FIX 1: Use doc.fileSize instead of doc.size
+  const totalSize = documents.reduce(
+    (acc, doc) => acc + (doc.fileSize || 0),
+    0
+  );
+
+  // FIX 2: Use doc.mimeType instead of doc.fileType and add safety check
+  const imageDocs = documents.filter(
+    (doc) => doc.mimeType && doc.mimeType.startsWith("image")
   ).length;
 
   const formatTotalSize = (bytes) => {
@@ -78,30 +84,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
       {/* Header */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">D</span>
-            </div>
-            <h1 className="text-xl font-bold text-gray-800">DocVault</h1>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block text-sm text-right">
-              <p className="font-medium text-gray-800">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-red-500 transition-colors"
-              title="Logout"
-            >
-              <FaSignOutAlt size={20} />
-            </button>
-          </div>
-        </div>
-      </nav>
 
       <div className="container mx-auto px-4 py-8">
         {/* Stats Row */}

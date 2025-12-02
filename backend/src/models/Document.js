@@ -31,6 +31,16 @@ const documentSchema = new mongoose.Schema({
   extractedText: {
     type: String,
   },
+  // Add these new fields
+  mimeType: {
+    type: String,
+  },
+  fileSize: {
+    type: Number,
+  },
+  originalFileName: {
+    type: String,
+  },
 });
 
 export default mongoose.model("Document", documentSchema);

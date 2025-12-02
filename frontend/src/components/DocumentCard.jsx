@@ -9,7 +9,9 @@ import {
 } from "react-icons/fa";
 
 const DocumentCard = ({ document, onDelete }) => {
-  const { title, fileType, createdAt, fileUrl, size } = document;
+  // FIX: Destructure 'mimeType' and 'fileSize' instead of 'fileType' and 'size'
+  // We also default mimeType to a string to prevent "undefined" errors
+  const { title, mimeType = "", createdAt, fileUrl, fileSize } = document;
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -20,19 +22,21 @@ const DocumentCard = ({ document, onDelete }) => {
   };
 
   const formatSize = (bytes) => {
-    if (bytes === 0) return "0 B";
+    if (!bytes || bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
-  const isImage = fileType.startsWith("image/");
+  // FIX: Use safe navigation or the defaulted variable
+  const isImage = mimeType && mimeType.startsWith("image/");
 
   const getFileIcon = () => {
-    if (fileType.includes("pdf"))
+    // FIX: Check mimeType instead of fileType
+    if (mimeType.includes("pdf"))
       return <FaFilePdf className="text-red-500 text-4xl" />;
-    if (fileType.includes("image"))
+    if (mimeType.includes("image"))
       return <FaFileImage className="text-purple-500 text-4xl" />;
     return <FaFileAlt className="text-gray-500 text-4xl" />;
   };
@@ -52,7 +56,8 @@ const DocumentCard = ({ document, onDelete }) => {
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             {getFileIcon()}
             <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-              {fileType.split("/")[1] || "File"}
+              {/* FIX: Safe split on mimeType */}
+              {mimeType.split("/")[1] || "File"}
             </span>
           </div>
         )}
@@ -100,7 +105,8 @@ const DocumentCard = ({ document, onDelete }) => {
         <div className="mt-auto pt-2 flex items-center justify-between text-xs text-gray-500">
           <div className="flex flex-col gap-1">
             <span className="bg-gray-100 px-2 py-1 rounded text-gray-600 font-medium w-fit">
-              {formatSize(size || 0)}
+              {/* FIX: Pass fileSize instead of size */}
+              {formatSize(fileSize || 0)}
             </span>
           </div>
           <span className="font-medium">{formatDate(createdAt)}</span>
