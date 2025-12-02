@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:5000/api";
+// Use env var or default to localhost
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export const apiRequest = async (
   endpoint,
@@ -6,12 +7,7 @@ export const apiRequest = async (
   body = null,
   isFormData = false
 ) => {
-  const token = localStorage.getItem("token");
   const headers = {};
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
   if (!isFormData) {
     headers["Content-Type"] = "application/json";
@@ -20,6 +16,7 @@ export const apiRequest = async (
   const config = {
     method,
     headers,
+    credentials: "include", // IMPORTANT: This allows cookies to be sent/received
   };
 
   if (body) {
@@ -30,12 +27,8 @@ export const apiRequest = async (
   const data = await response.json();
 
   if (!response.ok) {
-    if (response.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.reload();
-      throw new Error("Session expired");
-    }
+    // If we get a 401, the AuthContext will handle the state update usually,
+    // but throwing here allows the calling component to handle errors UI.
     throw new Error(data.message || "Something went wrong");
   }
 

@@ -6,6 +6,8 @@ import { categorizeDocument } from "../utils/categorize.js";
 
 // Helper to handle OCR logic
 const performOCR = async (fileUrl, mimeType) => {
+  // If we had pdf-parse installed, we would handle application/pdf here.
+  // For now, we stick to images as per current dependencies.
   if (mimeType && mimeType.startsWith("image/")) {
     try {
       const text = await extractTextFromImage(fileUrl);
@@ -15,7 +17,7 @@ const performOCR = async (fileUrl, mimeType) => {
       return "";
     }
   }
-  return ""; // Skip OCR for non-images (like PDFs) for now
+  return "";
 };
 
 // @desc    Upload Document with OCR and Auto-Categorization
@@ -108,11 +110,17 @@ export const reprocessDocument = asyncHandler(async (req, res) => {
   res.json({ message: "Reprocessed successfully", doc });
 });
 
-// @desc    Get all Documents for user
-// @route   GET /api/document
+// @desc    Get all Documents for user with Pagination
+// @route   GET /api/document?page=1&limit=10
 // @access  Private
 export const getDocuments = asyncHandler(async (req, res) => {
   const { category, search } = req.query;
+
+  // Pagination constants
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
   let filter = { userId: req.user._id };
 
   if (category && category !== "All") {
@@ -126,8 +134,19 @@ export const getDocuments = asyncHandler(async (req, res) => {
     ];
   }
 
-  const documents = await Document.find(filter).sort({ createdAt: -1 });
-  res.json(documents);
+  const documents = await Document.find(filter)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const total = await Document.countDocuments(filter);
+
+  res.json({
+    documents,
+    page,
+    pages: Math.ceil(total / limit),
+    total,
+  });
 });
 
 // @desc    Get single document

@@ -1,30 +1,24 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
-import { apiRequest } from "../utils/api";
+import { Mail, Lock, Loader2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
-const Login = ({ setToken, setUser, setView }) => {
+const Login = ({ setView }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { login } = useAuth();
   const { addToast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await apiRequest("/auth/login", "POST", {
-        email,
-        password,
-      });
-
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data));
-      setToken(data.token);
-      setUser(data);
+      await login(email, password);
       addToast("Welcome back!", "success");
     } catch (err) {
-      addToast(err.message || "Login failed", "error");
+      addToast(err.message, "error");
     } finally {
       setLoading(false);
     }
@@ -32,55 +26,60 @@ const Login = ({ setToken, setUser, setView }) => {
 
   return (
     <div className="space-y-6">
-      <div className="text-center lg:text-left">
-        <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
         <p className="text-gray-500 mt-2">
-          Please enter your details to sign in.
+          Enter your details to access your vault
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email Address
-          </label>
-          <input
-            type="email"
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Email</label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+            <input
+              type="email"
+              required
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <input
-            type="password"
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+            <input
+              type="password"
+              required
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
         </div>
+
         <button
+          type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition font-semibold shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center"
+          className="w-full py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-semibold shadow-lg shadow-indigo-200 transition-all active:scale-95 flex justify-center items-center"
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign in"}
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
         </button>
       </form>
 
-      <p className="text-center text-gray-600">
-        Don't have an account?
+      <p className="text-center text-sm text-gray-600">
+        Don't have an account?{" "}
         <button
           onClick={() => setView("register")}
-          className="text-indigo-600 font-bold ml-1 hover:underline"
+          className="text-indigo-600 font-semibold hover:underline"
         >
-          Sign up for free
+          Create account
         </button>
       </p>
     </div>
