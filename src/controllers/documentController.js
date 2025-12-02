@@ -3,42 +3,48 @@ import cloudinary from "../config/cloudinary.js";
 import Document from "../models/Document.js";
 import { extractTextFromImage } from "../utils/ocr.js";
 import { categorizeDocument } from "../utils/categorize.js";
-import { Readable } from "stream";
+
+// Helper to handle OCR logic
+const performOCR = async (fileUrl, mimeType) => {
+  if (mimeType && mimeType.startsWith("image/")) {
+    try {
+      const text = await extractTextFromImage(fileUrl);
+      return text || "";
+    } catch (error) {
+      console.error("OCR Processing failed:", error);
+      return "";
+    }
+  }
+  return ""; // Skip OCR for non-images (like PDFs) for now
+};
 
 // @desc    Upload Document with OCR and Auto-Categorization
-// @route   POST /api/documents/upload
+// @route   POST /api/document/upload
 // @access  Private
-
 export const uploadDocument = asyncHandler(async (req, res) => {
   const { title, category, expiryDate } = req.body;
 
   if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded..." });
+    return res.status(400).json({ message: "No file uploaded" });
   }
 
   try {
     let fileUrl;
-    let tempFilePath;
 
     // Upload to Cloudinary
     if (req.file.buffer) {
-      // Handle memory storage (buffer)
-      const uploadResult = await cloudinary.uploader.upload(
-        `data:${req.file.mimetype};base64,${req.file.buffer.toString(
-          "base64"
-        )}`,
-        {
-          resource_type: "auto",
-          folder: "smart-vault",
-        }
-      );
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: "auto", folder: "smart-vault" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(req.file.buffer);
+      });
       fileUrl = uploadResult.secure_url;
-      tempFilePath = uploadResult.secure_url; // Use Cloudinary URL for OCR
     } else if (req.file.path) {
-      // Handle disk storage (local file path)
-      tempFilePath = req.file.path;
-
-      // Upload to Cloudinary from local path
       const uploadResult = await cloudinary.uploader.upload(req.file.path, {
         resource_type: "auto",
         folder: "smart-vault",
@@ -48,37 +54,19 @@ export const uploadDocument = asyncHandler(async (req, res) => {
       throw new Error("Invalid file format");
     }
 
-    // Initialize variables for OCR results
-    let extractedText = "";
-    let autoCategory = category || "General";
+    // Process OCR
+    const extractedText = await performOCR(fileUrl, req.file.mimetype);
 
-    // Check if file is an image for OCR processing
-    const isImage = req.file.mimetype.startsWith("image/");
-
-    if (isImage) {
-      try {
-        // Run OCR on the uploaded image
-        console.log("Running OCR on uploaded image...");
-        extractedText = await extractTextFromImage(tempFilePath);
-
-        if (extractedText && extractedText.trim()) {
-          // Auto-categorize based on extracted text if no manual category provided
-          if (!category) {
-            autoCategory = categorizeDocument(extractedText);
-            console.log(`Auto-categorized as: ${autoCategory}`);
-          }
-        }
-      } catch (ocrError) {
-        console.warn("OCR processing failed:", ocrError.message);
-        // Continue without OCR if it fails
-      }
+    // Auto Categorize
+    let finalCategory = category;
+    if (!finalCategory || finalCategory === "General") {
+      finalCategory = categorizeDocument(extractedText);
     }
 
-    // Create document in database
     const doc = await Document.create({
       userId: req.user._id,
-      title: title || req.file.originalname || "Untitled Document",
-      category: autoCategory,
+      title: title || req.file.originalname,
+      category: finalCategory || "General",
       fileUrl,
       extractedText,
       expiryDate: expiryDate || null,
@@ -87,27 +75,16 @@ export const uploadDocument = asyncHandler(async (req, res) => {
       mimeType: req.file.mimetype,
     });
 
-    res.status(201).json({
-      message: "Document uploaded successfully",
-      doc: {
-        ...doc.toObject(),
-        ocrProcessed: isImage && extractedText.length > 0,
-        autoCategorized: !category && autoCategory !== "General",
-      },
-    });
+    res.status(201).json(doc);
   } catch (error) {
     console.error("Upload error:", error);
-    res.status(500).json({
-      message: "Error uploading document",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Upload failed", error: error.message });
   }
 });
 
-// @desc    Re-process document with OCR (for existing docs)
-// @route   POST /api/documents/:id/reprocess
+// @desc    Re-process document with OCR
+// @route   PATCH /api/document/:id/reprocess
 // @access  Private
-
 export const reprocessDocument = asyncHandler(async (req, res) => {
   const doc = await Document.findById(req.params.id);
 
@@ -119,59 +96,29 @@ export const reprocessDocument = asyncHandler(async (req, res) => {
     return res.status(401).json({ message: "Not authorized" });
   }
 
-  try {
-    // Check if document is an image
-    const isImage = doc.mimeType && doc.mimeType.startsWith("image/");
+  const extractedText = await performOCR(doc.fileUrl, doc.mimeType);
+  const newCategory = categorizeDocument(extractedText);
 
-    if (!isImage) {
-      return res.status(400).json({
-        message: "OCR processing is only available for image files",
-      });
-    }
+  doc.extractedText = extractedText;
+  doc.category = newCategory;
+  doc.updatedAt = Date.now();
 
-    // Run OCR on the existing file
-    const extractedText = await extractTextFromImage(doc.fileUrl);
+  await doc.save();
 
-    // Re-categorize if needed
-    const autoCategory = categorizeDocument(extractedText);
-
-    // Update document
-    doc.extractedText = extractedText;
-    doc.category = autoCategory;
-    doc.updatedAt = new Date();
-
-    await doc.save();
-
-    res.json({
-      message: "Document reprocessed successfully",
-      doc,
-      extractedText,
-      newCategory: autoCategory,
-    });
-  } catch (error) {
-    console.error("Reprocess error:", error);
-    res.status(500).json({
-      message: "Error reprocessing document",
-      error: error.message,
-    });
-  }
+  res.json({ message: "Reprocessed successfully", doc });
 });
 
 // @desc    Get all Documents for user
-// @route   GET /api/documents
+// @route   GET /api/document
 // @access  Private
-
 export const getDocuments = asyncHandler(async (req, res) => {
   const { category, search } = req.query;
-
   let filter = { userId: req.user._id };
 
-  // Filter by category if provided
-  if (category && category !== "all") {
+  if (category && category !== "All") {
     filter.category = category;
   }
 
-  // Search in title or extracted text
   if (search) {
     filter.$or = [
       { title: { $regex: search, $options: "i" } },
@@ -184,77 +131,56 @@ export const getDocuments = asyncHandler(async (req, res) => {
 });
 
 // @desc    Get single document
-// @route   GET /api/documents/:id
+// @route   GET /api/document/:id
 // @access  Private
-
 export const getDocument = asyncHandler(async (req, res) => {
   const doc = await Document.findById(req.params.id);
 
-  if (!doc) {
+  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
     return res.status(404).json({ message: "Document not found" });
-  }
-
-  if (doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(401).json({ message: "Not authorized" });
   }
 
   res.json(doc);
 });
 
-// @desc    Update document
-// @route   PUT /api/documents/:id
+// @desc    Update document metadata
+// @route   PUT /api/document/:id
 // @access  Private
-
 export const updateDocument = asyncHandler(async (req, res) => {
   const { title, category } = req.body;
-
   const doc = await Document.findById(req.params.id);
 
-  if (!doc) {
+  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
     return res.status(404).json({ message: "Document not found" });
   }
 
-  if (doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  // Update fields
-  if (title) doc.title = title;
-  if (category) doc.category = category;
-  doc.updatedAt = new Date();
-
+  doc.title = title || doc.title;
+  doc.category = category || doc.category;
   await doc.save();
+
   res.json(doc);
 });
 
 // @desc    Delete document
-// @route   DELETE /api/documents/:id
+// @route   DELETE /api/document/:id
 // @access  Private
-
 export const deleteDocument = asyncHandler(async (req, res) => {
   const doc = await Document.findById(req.params.id);
 
-  if (!doc) {
+  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
     return res.status(404).json({ message: "Document not found" });
   }
 
-  if (doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
-  // Optional: Delete from Cloudinary as well
-  try {
-    // Extract public_id from Cloudinary URL
-    const urlParts = doc.fileUrl.split("/");
-    const fileName = urlParts[urlParts.length - 1];
-    const publicId = `smart-vault/${fileName.split(".")[0]}`;
-
-    await cloudinary.uploader.destroy(publicId);
-  } catch (cloudinaryError) {
-    console.warn("Failed to delete from Cloudinary:", cloudinaryError.message);
-    // Continue with database deletion even if Cloudinary deletion fails
+  // Cleanup Cloudinary
+  if (doc.fileUrl) {
+    try {
+      const publicId = doc.fileUrl.split("/").pop().split(".")[0];
+      await cloudinary.uploader.destroy(`smart-vault/${publicId}`);
+    } catch (err) {
+      console.error("Cloudinary delete error:", err);
+    }
   }
 
   await doc.deleteOne();
-  res.status(200).json({ message: "Document deleted successfully" });
+  res.json({ message: "Document removed" });
 });

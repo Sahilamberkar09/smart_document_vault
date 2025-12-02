@@ -12,11 +12,16 @@ import upload from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
+// Upload route
 router.post("/upload", protect, upload.single("file"), uploadDocument);
+
+// CRUD routes
 router.get("/", protect, getDocuments);
 router.get("/:id", protect, getDocument);
 router.put("/:id", protect, updateDocument);
 router.delete("/:id", protect, deleteDocument);
-router.delete("/:id/reprocess", protect, reprocessDocument);
+
+// OPTIMIZED: Changed from DELETE to PATCH as this is an update operation
+router.patch("/:id/reprocess", protect, reprocessDocument);
 
 export default router;
