@@ -1,104 +1,70 @@
 /**
- * Categorizes a document based on its text content using keyword matching.
- * @param {string} text - The text extracted from the document via OCR.
- * @returns {Promise<string>} - The determined category.
+ * Optimized Categorization Logic
+ * Includes specific detection for Indian Documents (Aadhaar, PAN, Voter ID, GST).
  */
-export const categorizeDocument = async (text) => {
-  if (!text || text.trim().length === 0) {
-    return "Uncategorized";
-  }
+export const categorizeDocument = (text) => {
+  if (!text) return "General";
 
-  const lowerText = text.toLowerCase();
+  const lower = text.toLowerCase();
 
-  // Define keywords for each category
-  const categories = {
-    Invoice: [
-      "invoice",
-      "bill to",
-      "due date",
-      "balance due",
-      "tax invoice",
-      "gst",
-      "vat",
-    ],
-    Receipt: [
-      "receipt",
-      "total",
-      "amount",
-      "cash",
-      "credit card",
-      "payment",
-      "transaction",
-    ],
-    Contract: [
-      "agreement",
-      "contract",
-      "parties",
-      "witness",
-      "signed",
-      "terms and conditions",
-      "whereas",
-    ],
-    Resume: [
-      "resume",
-      "experience",
-      "education",
-      "skills",
-      "curriculum vitae",
-      "cv",
-      "profile",
-      "work history",
-    ],
-    Report: [
-      "report",
-      "summary",
-      "conclusion",
-      "analysis",
-      "introduction",
-      "overview",
-      "status",
-    ],
-    Personal: [
-      "personal",
-      "confidential",
-      "dear",
-      "sincerely",
-      "letter",
-      "diary",
-    ],
-    Bill: [
-      "bill",
-      "statement",
-      "payment due",
-      "utility",
-      "electricity",
-      "gas",
-      "water",
-    ],
-  };
+  const categories = [
+    // --- Indian Specific Documents ---
+    {
+      name: "Aadhaar",
+      // Matches 'Aadhaar', 'UIDAI', or the specific text usually found on the card
+      keywords: /aadhaar|uidai|unique identification authority|mera aadhaar/i,
+    },
+    {
+      name: "PAN",
+      // 'pan' is too generic (matches 'japan', 'company'), so we check for 'pan card' or the full department name
+      keywords:
+        /permanent account number|income tax department|pan card|govt\.? of india/i,
+    },
+    {
+      name: "Voter ID",
+      keywords:
+        /election commission|elector's photo|epic no|voter identity|identity card/i,
+    },
 
-  let bestCategory = "Other";
-  let maxMatches = 0;
+    // --- Standard Documents (Enhanced) ---
+    {
+      name: "Passport",
+      keywords: /passport|republic|nationality|surname|given names/i,
+    },
+    {
+      name: "Invoice",
+      // Added GSTIN, CGST, SGST, IGST for Indian context
+      keywords:
+        /invoice|bill to|total amount|tax|gst|gstin|cgst|sgst|igst|due date/i,
+    },
+    {
+      name: "Licence",
+      keywords: /driving|licence|license|permit|driver|union of india/i,
+    },
+    {
+      name: "Insurance",
+      keywords: /insurance|policy number|coverage|premium|sum assured/i,
+    },
+    {
+      name: "Receipt",
+      keywords: /receipt|payment|transaction|paid|acknowledgement/i,
+    },
+    {
+      name: "Contract",
+      keywords: /agreement|contract|signed|witness|memorandum|deed/i,
+    },
+    {
+      name: "Academic",
+      keywords:
+        /university|college|school|grade|transcript|certificate|marksheet|board/i,
+    },
+  ];
 
-  // Count keyword matches for each category
-  for (const [category, keywords] of Object.entries(categories)) {
-    let matches = 0;
-    keywords.forEach((keyword) => {
-      if (lowerText.includes(keyword)) {
-        matches++;
-      }
-    });
-
-    if (matches > maxMatches) {
-      maxMatches = matches;
-      bestCategory = category;
+  for (const cat of categories) {
+    if (cat.keywords.test(lower)) {
+      return cat.name;
     }
   }
 
-  // If no significant matches are found, default to 'Other'
-  if (maxMatches === 0) {
-    return "Other";
-  }
-
-  return bestCategory;
+  return "Others";
 };

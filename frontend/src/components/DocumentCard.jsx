@@ -1,115 +1,88 @@
 import React from "react";
-import {
-  FaFilePdf,
-  FaFileImage,
-  FaFileAlt,
-  FaTrash,
-  FaDownload,
-  FaEye,
-} from "react-icons/fa";
+import { Calendar, RefreshCw, Trash2, FileText } from "lucide-react";
 
-const DocumentCard = ({ document, onDelete }) => {
-  // FIX: Destructure 'mimeType' and 'fileSize' instead of 'fileType' and 'size'
-  // We also default mimeType to a string to prevent "undefined" errors
-  const { title, mimeType = "", createdAt, fileUrl, fileSize } = document;
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatSize = (bytes) => {
-    if (!bytes || bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  };
-
-  // FIX: Use safe navigation or the defaulted variable
-  const isImage = mimeType && mimeType.startsWith("image/");
-
-  const getFileIcon = () => {
-    // FIX: Check mimeType instead of fileType
-    if (mimeType.includes("pdf"))
-      return <FaFilePdf className="text-red-500 text-4xl" />;
-    if (mimeType.includes("image"))
-      return <FaFileImage className="text-purple-500 text-4xl" />;
-    return <FaFileAlt className="text-gray-500 text-4xl" />;
-  };
-
+const DocumentCard = ({ doc, onDelete, onReprocess }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 overflow-hidden flex flex-col h-full group">
-      {/* Preview Section */}
-      <div className="h-48 w-full bg-gray-50 relative border-b border-gray-100 group-hover:bg-gray-100 transition-colors">
-        {isImage ? (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 group flex flex-col h-full overflow-hidden hover:-translate-y-1">
+      {/* Preview Header */}
+      <div className="h-40 bg-gray-100 relative overflow-hidden">
+        {doc.mimeType?.startsWith("image") ? (
           <img
-            src={fileUrl}
-            alt={title}
-            className="w-full h-full object-cover object-center"
-            loading="lazy"
+            src={doc.fileUrl}
+            alt={doc.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-            {getFileIcon()}
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-              {/* FIX: Safe split on mimeType */}
-              {mimeType.split("/")[1] || "File"}
-            </span>
+          <div className="flex items-center justify-center h-full text-gray-300 bg-gray-50">
+            <FileText className="w-16 h-16" />
           </div>
         )}
 
         {/* Overlay Actions */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[1px]">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
           <a
-            href={fileUrl}
+            href={doc.fileUrl}
             target="_blank"
-            rel="noopener noreferrer"
-            className="p-3 bg-white rounded-full text-gray-700 hover:text-primary hover:scale-110 transition-transform shadow-lg"
-            title="View"
+            rel="noreferrer"
+            className="bg-white text-gray-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-100 transform hover:scale-105 transition"
           >
-            <FaEye />
+            View File
           </a>
-          <a
-            href={fileUrl}
-            download
-            className="p-3 bg-white rounded-full text-gray-700 hover:text-primary hover:scale-110 transition-transform shadow-lg"
-            title="Download"
+        </div>
+
+        <div className="absolute top-3 right-3">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-md ${
+              doc.category === "Passport"
+                ? "bg-purple-100/90 text-purple-700"
+                : doc.category === "Invoice"
+                ? "bg-emerald-100/90 text-emerald-700"
+                : "bg-white/90 text-gray-700"
+            }`}
           >
-            <FaDownload />
-          </a>
+            {doc.category}
+          </span>
         </div>
       </div>
 
-      {/* Details Section */}
-      <div className="p-4 flex flex-col grow">
-        <div className="flex justify-between items-start mb-2">
-          <h3
-            className="font-semibold text-gray-800 truncate pr-2 flex-1"
-            title={title}
-          >
-            {title}
-          </h3>
-          <button
-            onClick={() => onDelete(document._id)}
-            className="text-gray-400 hover:text-red-500 transition-colors p-1"
-            title="Delete"
-          >
-            <FaTrash size={14} />
-          </button>
+      {/* Content */}
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 text-xs text-gray-400 mb-2 font-medium">
+          <Calendar className="w-3 h-3" />
+          {new Date(doc.createdAt).toLocaleDateString()}
         </div>
 
-        <div className="mt-auto pt-2 flex items-center justify-between text-xs text-gray-500">
-          <div className="flex flex-col gap-1">
-            <span className="bg-gray-100 px-2 py-1 rounded text-gray-600 font-medium w-fit">
-              {/* FIX: Pass fileSize instead of size */}
-              {formatSize(fileSize || 0)}
-            </span>
-          </div>
-          <span className="font-medium">{formatDate(createdAt)}</span>
+        <h3
+          className="font-bold text-gray-800 mb-1 truncate text-lg"
+          title={doc.title}
+        >
+          {doc.title}
+        </h3>
+
+        <p className="text-xs text-gray-400 mb-4">
+          {(doc.fileSize / 1024 / 1024).toFixed(2)} MB •{" "}
+          {doc.mimeType?.split("/")[1]?.toUpperCase()}
+        </p>
+
+        {/* Removed extracted text preview as requested */}
+
+        {/* Actions */}
+        <div className="mt-auto flex justify-between items-center pt-4 border-t border-gray-50">
+          <button
+            onClick={() => onReprocess(doc._id)}
+            className="text-gray-400 hover:text-indigo-600 transition flex items-center gap-1 text-xs font-medium"
+            title="Re-run OCR"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Reprocess</span>
+          </button>
+          <button
+            onClick={() => onDelete(doc._id)}
+            className="text-gray-400 hover:text-red-600 transition p-2 hover:bg-red-50 rounded-lg"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

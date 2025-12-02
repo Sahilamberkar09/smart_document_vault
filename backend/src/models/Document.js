@@ -1,42 +1,36 @@
 import mongoose from "mongoose";
 
-const documentSchema = mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      ref: "User",
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-    },
-    fileUrl: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String,
-      default: "Uncategorized",
-    },
-    extractedText: {
-      type: String,
-    },
-    fileType: {
-      type: String,
-    },
-    size: {
-      type: Number,
-    },
+const documentSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
   },
-  {
-    timestamps: true,
-  }
-);
+  title: {
+    type: String,
+    required: true,
+  },
+  category: {
+    type: String,
+    default: "General",
+  },
+  fileUrl: {
+    type: String,
+    required: true,
+  },
+  expiryDate: {
+    type: Date,
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  textContent: {
+    type: String,
+  },
+  extractedText: {
+    type: String,
+  },
+});
 
-const Document = mongoose.model("Document", documentSchema);
-
-export default Document;
+export default mongoose.model("Document", documentSchema);
