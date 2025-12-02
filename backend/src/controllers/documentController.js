@@ -1,205 +1,161 @@
-import asyncHandler from "express-async-handler";
-import cloudinary from "../config/cloudinary.js";
 import Document from "../models/Document.js";
-import { extractTextFromImage } from "../utils/ocr.js";
+import { extractText } from "../utils/ocr.js";
 import { categorizeDocument } from "../utils/categorize.js";
+import cloudinary from "../config/cloudinary.js";
+import fs from "fs";
 
-// Helper to handle OCR logic
-const performOCR = async (fileUrl, mimeType) => {
-  // If we had pdf-parse installed, we would handle application/pdf here.
-  // For now, we stick to images as per current dependencies.
-  if (mimeType && mimeType.startsWith("image/")) {
-    try {
-      const text = await extractTextFromImage(fileUrl);
-      return text || "";
-    } catch (error) {
-      console.error("OCR Processing failed:", error);
-      return "";
-    }
-  }
-  return "";
-};
-
-// @desc    Upload Document with OCR and Auto-Categorization
-// @route   POST /api/document/upload
-// @access  Private
-export const uploadDocument = asyncHandler(async (req, res) => {
-  const { title, category, expiryDate } = req.body;
-
-  if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded" });
-  }
-
+/**
+ * Uploads a document, performs OCR, runs AI categorization, and saves metadata.
+ */
+export const uploadDocument = async (req, res) => {
   try {
-    let fileUrl;
-
-    // Upload to Cloudinary
-    if (req.file.buffer) {
-      const uploadResult = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: "auto", folder: "smart-vault" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        uploadStream.end(req.file.buffer);
-      });
-      fileUrl = uploadResult.secure_url;
-    } else if (req.file.path) {
-      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "auto",
-        folder: "smart-vault",
-      });
-      fileUrl = uploadResult.secure_url;
-    } else {
-      throw new Error("Invalid file format");
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // Process OCR
-    const extractedText = await performOCR(fileUrl, req.file.mimetype);
+    const { title, description } = req.body;
+    const userId = req.user.id; // Assuming authMiddleware adds user to req
+    const filePath = req.file.path;
 
-    // Auto Categorize
-    let finalCategory = category;
-    if (!finalCategory || finalCategory === "General") {
-      finalCategory = categorizeDocument(extractedText);
-    }
+    // 1. Perform OCR to get text
+    console.log("Processing document...");
+    const extractedText = await extractText(filePath);
 
-    const doc = await Document.create({
-      userId: req.user._id,
+    // 2. Use AI to categorize the document based on the text
+    console.log("Categorizing document...");
+    const category = await categorizeDocument(extractedText);
+
+    // 3. Upload to Cloudinary (if not using cloud storage middleware directly)
+    // If using multer-storage-cloudinary, req.file.path is already the Cloudinary URL
+    // But typically OCR needs a local path or a readable URL.
+    // If req.file.path is a URL, Tesseract handles it.
+
+    // For this implementation, we assume req.file has the Cloudinary info or local path
+    // If it's stored locally first:
+    /*
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: "documents",
+    });
+    const fileUrl = result.secure_url;
+    // fs.unlinkSync(filePath); // Cleanup local file
+    */
+
+    // Assuming middleware handled cloud upload and gave us a path/url
+    const fileUrl = req.file.path;
+
+    // 4. Save to Database
+    const newDocument = new Document({
+      user: userId,
       title: title || req.file.originalname,
-      category: finalCategory || "General",
-      fileUrl,
-      extractedText,
-      expiryDate: expiryDate || null,
-      originalFileName: req.file.originalname,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
+      description,
+      fileUrl: fileUrl,
+      category: category,
+      extractedText: extractedText, // Optional: store text for search
+      fileType: req.file.mimetype,
+      size: req.file.size,
     });
 
-    res.status(201).json(doc);
+    const savedDocument = await newDocument.save();
+
+    res.status(201).json({
+      message: "Document uploaded and processed successfully",
+      document: savedDocument,
+    });
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ message: "Upload failed", error: error.message });
+    console.error("Upload Error:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
-});
+};
 
-// @desc    Re-process document with OCR
-// @route   PATCH /api/document/:id/reprocess
-// @access  Private
-export const reprocessDocument = asyncHandler(async (req, res) => {
-  const doc = await Document.findById(req.params.id);
-
-  if (!doc) {
-    return res.status(404).json({ message: "Document not found" });
+/**
+ * Get all documents for the logged-in user
+ */
+export const getDocuments = async (req, res) => {
+  try {
+    const documents = await Document.find({ user: req.user.id }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json(documents);
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    res.status(500).json({ message: "Server Error" });
   }
+};
 
-  if (doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
+/**
+ * Delete a document
+ */
+export const deleteDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
 
-  const extractedText = await performOCR(doc.fileUrl, doc.mimeType);
-  const newCategory = categorizeDocument(extractedText);
-
-  doc.extractedText = extractedText;
-  doc.category = newCategory;
-  doc.updatedAt = Date.now();
-
-  await doc.save();
-
-  res.json({ message: "Reprocessed successfully", doc });
-});
-
-// @desc    Get all Documents for user with Pagination
-// @route   GET /api/document?page=1&limit=10
-// @access  Private
-export const getDocuments = asyncHandler(async (req, res) => {
-  const { category, search } = req.query;
-
-  // Pagination constants
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
-
-  let filter = { userId: req.user._id };
-
-  if (category && category !== "All") {
-    filter.category = category;
-  }
-
-  if (search) {
-    filter.$or = [
-      { title: { $regex: search, $options: "i" } },
-      { extractedText: { $regex: search, $options: "i" } },
-    ];
-  }
-
-  const documents = await Document.find(filter)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
-
-  const total = await Document.countDocuments(filter);
-
-  res.json({
-    documents,
-    page,
-    pages: Math.ceil(total / limit),
-    total,
-  });
-});
-
-// @desc    Get single document
-// @route   GET /api/document/:id
-// @access  Private
-export const getDocument = asyncHandler(async (req, res) => {
-  const doc = await Document.findById(req.params.id);
-
-  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(404).json({ message: "Document not found" });
-  }
-
-  res.json(doc);
-});
-
-// @desc    Update document metadata
-// @route   PUT /api/document/:id
-// @access  Private
-export const updateDocument = asyncHandler(async (req, res) => {
-  const { title, category } = req.body;
-  const doc = await Document.findById(req.params.id);
-
-  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(404).json({ message: "Document not found" });
-  }
-
-  doc.title = title || doc.title;
-  doc.category = category || doc.category;
-  await doc.save();
-
-  res.json(doc);
-});
-
-// @desc    Delete document
-// @route   DELETE /api/document/:id
-// @access  Private
-export const deleteDocument = asyncHandler(async (req, res) => {
-  const doc = await Document.findById(req.params.id);
-
-  if (!doc || doc.userId.toString() !== req.user._id.toString()) {
-    return res.status(404).json({ message: "Document not found" });
-  }
-
-  // Cleanup Cloudinary
-  if (doc.fileUrl) {
-    try {
-      const publicId = doc.fileUrl.split("/").pop().split(".")[0];
-      await cloudinary.uploader.destroy(`smart-vault/${publicId}`);
-    } catch (err) {
-      console.error("Cloudinary delete error:", err);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
     }
-  }
 
-  await doc.deleteOne();
-  res.json({ message: "Document removed" });
-});
+    // Check user ownership
+    if (document.user.toString() !== req.user.id) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    await document.deleteOne();
+    res.status(200).json({ message: "Document removed" });
+  } catch (error) {
+    console.error("Delete Error:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+/**
+ * Re-categorize a document using AI (for existing documents)
+ */
+export const reCategorizeDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Check user ownership
+    if (document.user.toString() !== req.user.id) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    console.log(`Re-categorizing document: ${document.title}`);
+
+    // If we have extracted text, use it. Otherwise, try to extract from the file URL.
+    let textToAnalyze = document.extractedText;
+
+    if (!textToAnalyze && document.fileUrl) {
+      console.log("No extracted text found. Attempting OCR on file URL...");
+      // Tesseract.js accepts URLs
+      textToAnalyze = await extractText(document.fileUrl);
+
+      // Update the document with the extracted text if found
+      if (textToAnalyze) {
+        document.extractedText = textToAnalyze;
+      }
+    }
+
+    if (!textToAnalyze) {
+      return res
+        .status(400)
+        .json({ message: "Could not extract text for categorization." });
+    }
+
+    const newCategory = await categorizeDocument(textToAnalyze);
+
+    document.category = newCategory;
+    await document.save();
+
+    res.status(200).json({
+      message: "Document re-categorized successfully",
+      category: newCategory,
+      document: document,
+    });
+  } catch (error) {
+    console.error("Re-categorize Error:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
