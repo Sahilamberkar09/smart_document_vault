@@ -1,8 +1,6 @@
 import Document from "../models/Document.js";
 import { extractText } from "../utils/ocr.js";
 import { categorizeDocument } from "../utils/categorize.js";
-import cloudinary from "../config/cloudinary.js";
-import fs from "fs";
 
 /**
  * Uploads a document, performs OCR, runs AI categorization, and saves metadata.
@@ -13,46 +11,29 @@ export const uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const { title, description } = req.body;
-    const userId = req.user.id; // Assuming authMiddleware adds user to req
-    const filePath = req.file.path;
+    const { title } = req.body;
+    const userId = req.user._id;
+    // req.file.path is provided by multer-storage-cloudinary as the secure URL
+    const fileUrl = req.file.path;
 
-    // 1. Perform OCR to get text
+    // 1. Perform OCR
     console.log("Processing document...");
-    const extractedText = await extractText(filePath);
+    const extractedText = await extractText(fileUrl);
 
-    // 2. Use AI to categorize the document based on the text
+    // 2. Use AI to categorize
     console.log("Categorizing document...");
     const category = await categorizeDocument(extractedText);
 
-    // 3. Upload to Cloudinary (if not using cloud storage middleware directly)
-    // If using multer-storage-cloudinary, req.file.path is already the Cloudinary URL
-    // But typically OCR needs a local path or a readable URL.
-    // If req.file.path is a URL, Tesseract handles it.
-
-    // For this implementation, we assume req.file has the Cloudinary info or local path
-    // If it's stored locally first:
-    /*
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: "documents",
-    });
-    const fileUrl = result.secure_url;
-    // fs.unlinkSync(filePath); // Cleanup local file
-    */
-
-    // Assuming middleware handled cloud upload and gave us a path/url
-    const fileUrl = req.file.path;
-
-    // 4. Save to Database
+    // 3. Save to Database
     const newDocument = new Document({
-      user: userId,
+      userId: userId, // Fixed: match schema "userId"
       title: title || req.file.originalname,
-      description,
       fileUrl: fileUrl,
       category: category,
-      extractedText: extractedText, // Optional: store text for search
-      fileType: req.file.mimetype,
-      size: req.file.size,
+      extractedText: extractedText,
+      mimeType: req.file.mimetype, // Fixed: match schema "mimeType"
+      fileSize: req.file.size, // Fixed: match schema "fileSize"
+      originalFileName: req.file.originalname,
     });
 
     const savedDocument = await newDocument.save();
@@ -72,12 +53,62 @@ export const uploadDocument = async (req, res) => {
  */
 export const getDocuments = async (req, res) => {
   try {
-    const documents = await Document.find({ user: req.user.id }).sort({
+    // Fixed: match schema "userId"
+    const documents = await Document.find({ userId: req.user._id }).sort({
       createdAt: -1,
     });
     res.status(200).json(documents);
   } catch (error) {
     console.error("Fetch Error:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+/**
+ * Get a single document
+ */
+export const getDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Fixed: match schema "userId"
+    if (document.userId.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    res.status(200).json(document);
+  } catch (error) {
+    console.error("Get Document Error:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+/**
+ * Update document metadata (title, etc)
+ */
+export const updateDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    if (document.userId.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    document.title = req.body.title || document.title;
+    document.category = req.body.category || document.category;
+
+    const updatedDocument = await document.save();
+    res.json(updatedDocument);
+  } catch (error) {
+    console.error("Update Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -93,8 +124,8 @@ export const deleteDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Check user ownership
-    if (document.user.toString() !== req.user.id) {
+    // Fixed: match schema "userId"
+    if (document.userId.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
@@ -107,7 +138,7 @@ export const deleteDocument = async (req, res) => {
 };
 
 /**
- * Re-categorize a document using AI (for existing documents)
+ * Re-categorize a document
  */
 export const reCategorizeDocument = async (req, res) => {
   try {
@@ -117,35 +148,26 @@ export const reCategorizeDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Check user ownership
-    if (document.user.toString() !== req.user.id) {
+    // Fixed: match schema "userId"
+    if (document.userId.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    console.log(`Re-categorizing document: ${document.title}`);
-
-    // If we have extracted text, use it. Otherwise, try to extract from the file URL.
     let textToAnalyze = document.extractedText;
 
     if (!textToAnalyze && document.fileUrl) {
       console.log("No extracted text found. Attempting OCR on file URL...");
-      // Tesseract.js accepts URLs
       textToAnalyze = await extractText(document.fileUrl);
-
-      // Update the document with the extracted text if found
       if (textToAnalyze) {
         document.extractedText = textToAnalyze;
       }
     }
 
     if (!textToAnalyze) {
-      return res
-        .status(400)
-        .json({ message: "Could not extract text for categorization." });
+      return res.status(400).json({ message: "Could not extract text." });
     }
 
     const newCategory = await categorizeDocument(textToAnalyze);
-
     document.category = newCategory;
     await document.save();
 
@@ -156,6 +178,6 @@ export const reCategorizeDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Re-categorize Error:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    res.status(500).json({ message: "Server Error" });
   }
 };

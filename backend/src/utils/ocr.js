@@ -1,11 +1,11 @@
-const tesseract = require("tesseract.js");
+import tesseract from "tesseract.js";
 
 /**
  * Extracts text from an image file using Tesseract.js.
  * @param {string} filePath - Path to the image file.
  * @returns {Promise<string>} - Extracted text.
  */
-const extractText = async (filePath) => {
+export const extractText = async (filePath) => {
   try {
     console.log(`Starting OCR for file: ${filePath}`);
 
@@ -23,5 +23,3 @@ const extractText = async (filePath) => {
     return "";
   }
 };
-
-module.exports = { extractText };

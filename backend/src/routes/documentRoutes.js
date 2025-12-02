@@ -5,6 +5,7 @@ import {
   getDocument,
   updateDocument,
   deleteDocument,
+  reCategorizeDocument, // Fixed import name
 } from "../controllers/documentController.js";
 import protect from "../middlewares/authMiddleware.js";
 import upload from "../middlewares/uploadMiddleware.js";
@@ -20,8 +21,7 @@ router.get("/:id", protect, getDocument);
 router.put("/:id", protect, updateDocument);
 router.delete("/:id", protect, deleteDocument);
 
-
-// OPTIMIZED: Changed from DELETE to PATCH as this is an update operation
-router.patch("/:id/reprocess", protect, reprocessDocument);
+// Fixed: Route matches the imported controller name
+router.patch("/:id/reprocess", protect, reCategorizeDocument);
 
 export default router;
