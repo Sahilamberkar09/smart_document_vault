@@ -1,10 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 /**
- * Categorizes a document based on its text content using Gemini 1.5 Flash.
+ * Categorizes a document based on its text content using keyword matching.
  * @param {string} text - The text extracted from the document via OCR.
  * @returns {Promise<string>} - The determined category.
  */
@@ -13,43 +8,97 @@ export const categorizeDocument = async (text) => {
     return "Uncategorized";
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const lowerText = text.toLowerCase();
 
-    const prompt = `
-      Analyze the following text extracted from a document and categorize it into exactly one of these categories: 
-      "Invoice", "Receipt", "Contract", "Resume", "Report", "Personal", "Bill", or "Other".
+  // Define keywords for each category
+  const categories = {
+    Invoice: [
+      "invoice",
+      "bill to",
+      "due date",
+      "balance due",
+      "tax invoice",
+      "gst",
+      "vat",
+    ],
+    Receipt: [
+      "receipt",
+      "total",
+      "amount",
+      "cash",
+      "credit card",
+      "payment",
+      "transaction",
+    ],
+    Contract: [
+      "agreement",
+      "contract",
+      "parties",
+      "witness",
+      "signed",
+      "terms and conditions",
+      "whereas",
+    ],
+    Resume: [
+      "resume",
+      "experience",
+      "education",
+      "skills",
+      "curriculum vitae",
+      "cv",
+      "profile",
+      "work history",
+    ],
+    Report: [
+      "report",
+      "summary",
+      "conclusion",
+      "analysis",
+      "introduction",
+      "overview",
+      "status",
+    ],
+    Personal: [
+      "personal",
+      "confidential",
+      "dear",
+      "sincerely",
+      "letter",
+      "diary",
+    ],
+    Bill: [
+      "bill",
+      "statement",
+      "payment due",
+      "utility",
+      "electricity",
+      "gas",
+      "water",
+    ],
+  };
 
-      If the text is too sparse or ambiguous to determine a category, return "Other".
-      Return *only* the category name as a single string. Do not include any explanation or punctuation.
+  let bestCategory = "Other";
+  let maxMatches = 0;
 
-      Document Text:
-      "${text.substring(0, 3000)}" 
-    `;
+  // Count keyword matches for each category
+  for (const [category, keywords] of Object.entries(categories)) {
+    let matches = 0;
+    keywords.forEach((keyword) => {
+      if (lowerText.includes(keyword)) {
+        matches++;
+      }
+    });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const category = response.text().trim();
-
-    const cleanedCategory = category.replace(/[^a-zA-Z]/g, "");
-    const validCategories = [
-      "Invoice",
-      "Receipt",
-      "Contract",
-      "Resume",
-      "Report",
-      "Personal",
-      "Bill",
-      "Other",
-    ];
-
-    const match = validCategories.find((c) =>
-      cleanedCategory.toLowerCase().includes(c.toLowerCase())
-    );
-
-    return match || "Other";
-  } catch (error) {
-    console.error("AI Categorization Error:", error);
-    return "Uncategorized";
+    if (matches > maxMatches) {
+      maxMatches = matches;
+      bestCategory = category;
+    }
   }
+
+  // If no significant matches are found, default to 'Other'
+  if (maxMatches === 0) {
+    return "Other";
+  }
+
+  return bestCategory;
 };

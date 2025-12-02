@@ -3,7 +3,7 @@ import { extractText } from "../utils/ocr.js";
 import { categorizeDocument } from "../utils/categorize.js";
 
 /**
- * Uploads a document, performs OCR, runs AI categorization, and saves metadata.
+ * Uploads a document, performs OCR, runs automatic categorization, and saves metadata.
  */
 export const uploadDocument = async (req, res) => {
   try {
@@ -19,13 +19,13 @@ export const uploadDocument = async (req, res) => {
     console.log("Processing document...");
     const extractedText = await extractText(fileUrl);
 
-    // 2. Use AI to categorize
+    // 2. Use Keyword Matching to categorize
     console.log("Categorizing document...");
     const category = await categorizeDocument(extractedText);
 
     // 3. Save to Database
     const newDocument = new Document({
-      user: userId, // FIX: Changed 'userId' to 'user' to match Schema
+      user: userId,
       title: title || req.file.originalname,
       fileUrl: fileUrl,
       category: category,
@@ -52,7 +52,6 @@ export const uploadDocument = async (req, res) => {
  */
 export const getDocuments = async (req, res) => {
   try {
-    // FIX: Changed 'userId' to 'user'
     const documents = await Document.find({ user: req.user._id }).sort({
       createdAt: -1,
     });
@@ -74,7 +73,6 @@ export const getDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // FIX: Changed 'userId' to 'user'
     if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
@@ -97,7 +95,6 @@ export const updateDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // FIX: Changed 'userId' to 'user'
     if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
@@ -124,7 +121,6 @@ export const deleteDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // FIX: Changed 'userId' to 'user'
     if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
@@ -148,7 +144,6 @@ export const reCategorizeDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // FIX: Changed 'userId' to 'user'
     if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }

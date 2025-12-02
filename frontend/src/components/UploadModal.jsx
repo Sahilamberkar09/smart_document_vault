@@ -5,10 +5,8 @@ import { FaCloudUploadAlt, FaTimes, FaSpinner } from "react-icons/fa";
 
 const UploadModal = ({ onClose, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
-  const [category, setCategory] = useState("Uncategorized");
   const [loading, setLoading] = useState(false);
 
-  // FIX: Destructure addToast instead of showToast
   const { addToast } = useToast();
 
   const handleFileChange = (e) => {
@@ -17,22 +15,19 @@ const UploadModal = ({ onClose, onUploadSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // FIX: Use addToast
     if (!file) return addToast("Please select a file", "error");
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("category", category);
+    // Category is now determined automatically by the backend
 
     setLoading(true);
     try {
       await uploadDocument(formData);
-      // FIX: Use addToast
-      addToast("Document uploaded successfully", "success");
+      addToast("Document uploaded and categorized successfully", "success");
       onUploadSuccess();
       onClose();
     } catch (error) {
-      // FIX: Use addToast
       addToast("Upload failed", "error");
     } finally {
       setLoading(false);
@@ -89,23 +84,6 @@ const UploadModal = ({ onClose, onUploadSuccess }) => {
                 </span>
               </label>
             </div>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category (Optional)
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all bg-white"
-            >
-              <option value="Uncategorized">Uncategorized</option>
-              <option value="Finance">Finance</option>
-              <option value="Legal">Legal</option>
-              <option value="Personal">Personal</option>
-              <option value="Work">Work</option>
-            </select>
           </div>
 
           <div className="flex gap-3">
