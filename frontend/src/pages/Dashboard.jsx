@@ -5,22 +5,16 @@ import UploadModal from "../components/UploadModal";
 import StatCard from "../components/StatCard";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import {
-  FaPlus,
-  FaSearch,
-  FaFileAlt,
-  FaHdd,
-  FaImage,
-  FaSignOutAlt,
-} from "react-icons/fa";
-// no router hook here — App doesn't use react-router, so avoid useNavigate
+import { FaPlus, FaSearch, FaFileAlt, FaHdd, FaImage } from "react-icons/fa";
 
 const Dashboard = () => {
   const [documents, setDocuments] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { user, logout } = useAuth();
-  const { showToast } = useToast();
+
+  // FIX: Destructure addToast instead of showToast
+  const { addToast } = useToast();
 
   useEffect(() => {
     fetchDocuments();
@@ -29,12 +23,11 @@ const Dashboard = () => {
   const fetchDocuments = async () => {
     try {
       const res = await getDocuments();
-      // backend returns { documents, page, pages, total }
-      // ensure we always set an array on state to avoid undefined
       const docs = (res && res.documents) || res || [];
       setDocuments(docs);
     } catch (error) {
-      showToast("Failed to fetch documents", "error");
+      // FIX: Use addToast
+      addToast("Failed to fetch documents", "error");
     }
   };
 
@@ -43,9 +36,11 @@ const Dashboard = () => {
       try {
         await deleteDocument(id);
         setDocuments(documents.filter((doc) => doc._id !== id));
-        showToast("Document deleted successfully", "success");
+        // FIX: Use addToast
+        addToast("Document deleted successfully", "success");
       } catch (error) {
-        showToast("Failed to delete document", "error");
+        // FIX: Use addToast
+        addToast("Failed to delete document", "error");
       }
     }
   };
@@ -53,25 +48,23 @@ const Dashboard = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      showToast("Logged out", "success");
+      addToast("Logged out", "success");
     } catch (err) {
-      showToast("Logout failed", "error");
+      addToast("Logout failed", "error");
     }
   };
 
   const filteredDocuments = documents.filter((doc) =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  // Stats Logic
+
   const totalDocs = documents.length;
 
-  // FIX 1: Use doc.fileSize instead of doc.size
   const totalSize = documents.reduce(
     (acc, doc) => acc + (doc.fileSize || 0),
     0
   );
 
-  // FIX 2: Use doc.mimeType instead of doc.fileType and add safety check
   const imageDocs = documents.filter(
     (doc) => doc.mimeType && doc.mimeType.startsWith("image")
   ).length;
@@ -83,10 +76,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
-      {/* Header */}
-
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Total Documents"
@@ -108,7 +98,6 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Action Bar */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
           <div className="relative w-full md:w-96">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -130,7 +119,6 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Content Grid */}
         {filteredDocuments.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredDocuments.map((doc) => (

@@ -13,7 +13,6 @@ export const uploadDocument = async (req, res) => {
 
     const { title } = req.body;
     const userId = req.user._id;
-    // req.file.path is provided by multer-storage-cloudinary as the secure URL
     const fileUrl = req.file.path;
 
     // 1. Perform OCR
@@ -26,13 +25,13 @@ export const uploadDocument = async (req, res) => {
 
     // 3. Save to Database
     const newDocument = new Document({
-      userId: userId, // Fixed: match schema "userId"
+      user: userId, // FIX: Changed 'userId' to 'user' to match Schema
       title: title || req.file.originalname,
       fileUrl: fileUrl,
       category: category,
       extractedText: extractedText,
-      mimeType: req.file.mimetype, // Fixed: match schema "mimeType"
-      fileSize: req.file.size, // Fixed: match schema "fileSize"
+      mimeType: req.file.mimetype,
+      fileSize: req.file.size,
       originalFileName: req.file.originalname,
     });
 
@@ -53,8 +52,8 @@ export const uploadDocument = async (req, res) => {
  */
 export const getDocuments = async (req, res) => {
   try {
-    // Fixed: match schema "userId"
-    const documents = await Document.find({ userId: req.user._id }).sort({
+    // FIX: Changed 'userId' to 'user'
+    const documents = await Document.find({ user: req.user._id }).sort({
       createdAt: -1,
     });
     res.status(200).json(documents);
@@ -75,8 +74,8 @@ export const getDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Fixed: match schema "userId"
-    if (document.userId.toString() !== req.user._id.toString()) {
+    // FIX: Changed 'userId' to 'user'
+    if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
@@ -98,7 +97,8 @@ export const updateDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    if (document.userId.toString() !== req.user._id.toString()) {
+    // FIX: Changed 'userId' to 'user'
+    if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
@@ -124,8 +124,8 @@ export const deleteDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Fixed: match schema "userId"
-    if (document.userId.toString() !== req.user._id.toString()) {
+    // FIX: Changed 'userId' to 'user'
+    if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
@@ -148,8 +148,8 @@ export const reCategorizeDocument = async (req, res) => {
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Fixed: match schema "userId"
-    if (document.userId.toString() !== req.user._id.toString()) {
+    // FIX: Changed 'userId' to 'user'
+    if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 

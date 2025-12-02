@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { apiRequest } from "../utils/api";
 
@@ -11,24 +12,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is logged in on mount (via cookie)
+  // FIX: Check localStorage instead of calling non-existent /auth/profile route
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const userData = await apiRequest("/auth/profile", "GET");
-        setUser(userData);
-      } catch (err) {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
+    const storedUser = localStorage.getItem("userInfo");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setLoading(false);
   }, []);
 
   const login = async (email, password) => {
     const data = await apiRequest("/auth/login", "POST", { email, password });
+    // FIX: Save user data (including token) to localStorage
+    localStorage.setItem("userInfo", JSON.stringify(data));
     setUser(data);
     return data;
   };
@@ -39,16 +35,15 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
     });
+    // FIX: Save user data (including token) to localStorage
+    localStorage.setItem("userInfo", JSON.stringify(data));
     setUser(data);
     return data;
   };
 
-  const logout = async () => {
-    try {
-      await apiRequest("/auth/logout", "POST");
-    } catch (err) {
-      console.error("Logout error", err);
-    }
+  const logout = () => {
+    // FIX: Removed apiRequest("/auth/logout") because the route doesn't exist in backend
+    localStorage.removeItem("userInfo");
     setUser(null);
   };
 

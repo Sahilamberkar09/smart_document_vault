@@ -7,7 +7,9 @@ const UploadModal = ({ onClose, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [category, setCategory] = useState("Uncategorized");
   const [loading, setLoading] = useState(false);
-  const { showToast } = useToast();
+
+  // FIX: Destructure addToast instead of showToast
+  const { addToast } = useToast();
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -15,7 +17,8 @@ const UploadModal = ({ onClose, onUploadSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) return showToast("Please select a file", "error");
+    // FIX: Use addToast
+    if (!file) return addToast("Please select a file", "error");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -24,11 +27,13 @@ const UploadModal = ({ onClose, onUploadSuccess }) => {
     setLoading(true);
     try {
       await uploadDocument(formData);
-      showToast("Document uploaded successfully", "success");
+      // FIX: Use addToast
+      addToast("Document uploaded successfully", "success");
       onUploadSuccess();
       onClose();
     } catch (error) {
-      showToast("Upload failed", "error");
+      // FIX: Use addToast
+      addToast("Upload failed", "error");
     } finally {
       setLoading(false);
     }

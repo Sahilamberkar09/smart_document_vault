@@ -1,6 +1,4 @@
-// Unified API helper using fetch with cookies (httpOnly JWT cookie on backend)
-// This file exports `apiRequest` (used by AuthContext) and several
-// convenience functions used throughout the frontend.
+// frontend/src/utils/api.js
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -12,6 +10,15 @@ export const apiRequest = async (
 ) => {
   const headers = {};
 
+  // FIX: Retrieve token from localStorage and set Authorization header
+  const userInfo = localStorage.getItem("userInfo");
+  if (userInfo) {
+    const { token } = JSON.parse(userInfo);
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   if (!isFormData) {
     headers["Content-Type"] = "application/json";
   }
@@ -19,7 +26,7 @@ export const apiRequest = async (
   const config = {
     method,
     headers,
-    credentials: "include", // send cookies (httpOnly JWT cookie)
+    // credentials: "include", // Not strictly needed since backend doesn't use cookies, but harmless to leave
   };
 
   if (body) {
@@ -48,9 +55,10 @@ export const registerUser = (userData) =>
   apiRequest("/auth/register", "POST", userData);
 
 // Documents
-export const getDocuments = (query = "") => apiRequest(`/document${query}`);
-export const deleteDocument = (id) => apiRequest(`/document/${id}`, "DELETE");
+// FIX: Changed "/document" to "/documents" to match backend server.js routes
+export const getDocuments = (query = "") => apiRequest(`/documents${query}`);
+export const deleteDocument = (id) => apiRequest(`/documents/${id}`, "DELETE");
 export const uploadDocument = (formData) =>
-  apiRequest(`/document/upload`, "POST", formData, true);
+  apiRequest(`/documents/upload`, "POST", formData, true);
 
 export default apiRequest;
