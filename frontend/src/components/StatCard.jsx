@@ -1,25 +1,26 @@
 import React from "react";
 
-const StatCard = ({ title, value, icon: Icon, variant = "blue" }) => {
-  const styles = {
-    blue: { bg: "bg-blue-50", text: "text-blue-600" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-600" },
-    purple: { bg: "bg-purple-50", text: "text-purple-600" },
+const StatCard = ({ title, value, icon, color }) => {
+  // Map color names to actual CSS variables or tailwind classes
+  const colorMap = {
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-green-50 text-green-600",
+    purple: "bg-purple-50 text-purple-600",
+    orange: "bg-orange-50 text-orange-600",
   };
 
-  const style = styles[variant] || styles.blue;
+  const iconClass = colorMap[color] || "bg-gray-50 text-gray-600";
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div
-        className={`p-4 rounded-xl ${style.bg} ${style.text} relative overflow-hidden`}
-      >
-        <Icon className="w-6 h-6 relative z-10" strokeWidth={2.5} />
-        <div className="absolute inset-0 bg-current opacity-10"></div>
-      </div>
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between transition-transform hover:-translate-y-1">
       <div>
-        <p className="text-gray-500 text-sm font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+        <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+      </div>
+      <div
+        className={`p-4 rounded-full ${iconClass} flex items-center justify-center text-xl`}
+      >
+        {icon}
       </div>
     </div>
   );

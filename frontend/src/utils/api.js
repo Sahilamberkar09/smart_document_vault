@@ -1,4 +1,7 @@
-// Use env var or default to localhost
+// Unified API helper using fetch with cookies (httpOnly JWT cookie on backend)
+// This file exports `apiRequest` (used by AuthContext) and several
+// convenience functions used throughout the frontend.
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export const apiRequest = async (
@@ -16,21 +19,38 @@ export const apiRequest = async (
   const config = {
     method,
     headers,
-    credentials: "include", // IMPORTANT: This allows cookies to be sent/received
+    credentials: "include", // send cookies (httpOnly JWT cookie)
   };
 
   if (body) {
     config.body = isFormData ? body : JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, config);
-  const data = await response.json();
+  const res = await fetch(`${API_URL}${endpoint}`, config);
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (e) {
+    // No JSON body
+  }
 
-  if (!response.ok) {
-    // If we get a 401, the AuthContext will handle the state update usually,
-    // but throwing here allows the calling component to handle errors UI.
-    throw new Error(data.message || "Something went wrong");
+  if (!res.ok) {
+    throw new Error((data && data.message) || "Something went wrong");
   }
 
   return data;
 };
+
+// Auth
+export const loginUser = (userData) =>
+  apiRequest("/auth/login", "POST", userData);
+export const registerUser = (userData) =>
+  apiRequest("/auth/register", "POST", userData);
+
+// Documents
+export const getDocuments = (query = "") => apiRequest(`/document${query}`);
+export const deleteDocument = (id) => apiRequest(`/document/${id}`, "DELETE");
+export const uploadDocument = (formData) =>
+  apiRequest(`/document/upload`, "POST", formData, true);
+
+export default apiRequest;
