@@ -18,30 +18,21 @@ const documentSchema = new mongoose.Schema(
     },
     publicId: {
       type: String,
-      required: true, // Needed for Cloudinary deletion
+      required: true,
     },
     fileType: {
-      type: String, // 'application/pdf', 'image/jpeg', etc.
+      type: String,
       required: true,
     },
     originalName: {
-      type: String, // Keep original filename for reference
+      type: String,
     },
     fileSize: {
-      type: Number, // Store size in bytes
+      type: Number,
     },
     category: {
       type: String,
       default: "Uncategorized",
-      enum: [
-        "Invoice",
-        "Receipt",
-        "Prescription",
-        "Report",
-        "Contract",
-        "Uncategorized",
-        "Other",
-      ],
     },
     tags: [
       {
@@ -50,8 +41,8 @@ const documentSchema = new mongoose.Schema(
       },
     ],
     ocrText: {
-      type: String, // Extracted text content
-      default: "",
+      type: String,
+      default: "", // Stores the text extracted during upload
     },
     isFavorite: {
       type: Boolean,

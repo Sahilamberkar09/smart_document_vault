@@ -103,23 +103,33 @@ const Dashboard = () => {
         </div>
 
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-          {["All", "Passport", "Invoice", "Licence", "Medical", "General"].map(
-            (cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
-                  category === cat
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                    : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-                }`}
-              >
-                {cat}
-              </button>
-            )
-          )}
+          {/* UPDATED: Comprehensive list matching backend categorization */}
+          {[
+            "All",
+            "Aadhaar",
+            "PAN",
+            "Voter ID",
+            "Passport",
+            "Invoice",
+            "Licence",
+            "Academic",
+            "Insurance",
+            "Medical",
+            "General",
+          ].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                category === cat
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                  : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-
         <button
           onClick={() => setShowUpload(true)}
           className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 font-semibold"

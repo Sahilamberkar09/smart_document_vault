@@ -13,14 +13,17 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   // FIX 1: Use 'addToast' to match the context definition
   const { addToast } = useToast();
-
   const categories = [
+    "Auto-Detect", // Renamed from Uncategorized
+    "Aadhaar", // Added new types
+    "PAN",
+    "Voter ID",
     "Invoice",
     "Receipt",
     "Prescription",
     "Report",
     "Contract",
-    "Uncategorized",
+    "Academic",
     "Other",
   ];
 
@@ -65,40 +68,35 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file || !title) {
-      // FIX 3: Updated function name
       addToast("Please select a file and provide a title", "error");
       return;
     }
 
+    // Map "Auto-Detect" back to "Uncategorized" for the backend logic
+    const finalCategory =
+      category === "Auto-Detect" ? "Uncategorized" : category;
+
     const formData = new FormData();
     formData.append("document", file);
     formData.append("title", title);
-    formData.append("category", category);
+    formData.append("category", finalCategory);
 
     setUploading(true);
 
     try {
-      await api.post("/document/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // FIX: Removed the manual 'headers' object.
+      // Axios detects FormData and automatically sets the correct Content-Type with boundary.
+      await api.post("/document/upload", formData);
 
-      // FIX 4: Updated function name
       addToast("Document uploaded successfully!", "success");
 
       if (onUploadSuccess) {
-        onUploadSuccess(); // This unmounts the modal
+        onUploadSuccess();
       }
-
-      // FIX 5: Removed handleClose() and finally block here
-      // Reason: The modal is already unmounted by onUploadSuccess,
-      // so we shouldn't try to update state (setUploading) afterwards.
     } catch (error) {
       console.error("Upload failed", error);
-      // FIX 6: Updated function name
       addToast(error.response?.data?.message || "Upload failed", "error");
-      setUploading(false); // Only stop loading if upload FAILED and modal is still open
+      setUploading(false);
     }
   };
 

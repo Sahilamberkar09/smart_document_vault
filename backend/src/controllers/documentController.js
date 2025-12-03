@@ -1,6 +1,9 @@
 import Document from "../models/Document.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
+// Import the existing utilities
+import { extractTextFromImage } from "../utils/ocr.js";
+import { categorizeDocument } from "../utils/categorize.js";
 
 // @desc    Upload a new document
 // @route   POST /api/documents/upload
@@ -13,12 +16,31 @@ export const uploadDocument = async (req, res) => {
 
     const { title, category, tags } = req.body;
 
+    // 1. Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: "smart_doc_vault",
       resource_type: "auto",
       use_filename: true,
     });
 
+    // 2. Perform OCR before deleting the local file
+    // We try/catch this block specifically so OCR failure doesn't block the upload
+    let ocrText = "";
+    try {
+      ocrText = await extractTextFromImage(req.file.path);
+    } catch (err) {
+      console.error("OCR Failed:", err);
+    }
+
+    // 3. Determine Category Automatically
+    // If the user didn't pick a specific category (or left it as 'Uncategorized'),
+    // we use the one derived from the OCR text.
+    let finalCategory = category;
+    if (!category || category === "Uncategorized") {
+      finalCategory = categorizeDocument(ocrText);
+    }
+
+    // 4. Delete local file
     try {
       fs.unlinkSync(req.file.path);
     } catch (err) {
@@ -32,6 +54,7 @@ export const uploadDocument = async (req, res) => {
         : tags.split(",").map((tag) => tag.trim());
     }
 
+    // 5. Create Document in DB
     const document = await Document.create({
       user: req.user._id,
       title: title || req.file.originalname,
@@ -40,20 +63,27 @@ export const uploadDocument = async (req, res) => {
       publicId: result.public_id,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
-      category: category || "Uncategorized",
+      category: finalCategory, // Uses the auto-detected category
       tags: parsedTags,
+      ocrText: ocrText, // Saves the extracted text
     });
 
     res.status(201).json(document);
   } catch (error) {
     console.error("Upload error:", error);
+    // Attempt to clean up file if main execution failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkErr) {
+        console.error("Error deleting file after failure:", unlinkErr);
+      }
+    }
     res.status(500).json({ message: "Server Error during upload" });
   }
 };
 
-// @desc    Get all documents for user
-// @route   GET /api/documents
-// @access  Private
+// ... (Keep the rest of the existing controller functions: getDocuments, getDocument, etc. exactly as they were)
 export const getDocuments = async (req, res) => {
   try {
     const documents = await Document.find({ user: req.user._id }).sort({
@@ -65,9 +95,6 @@ export const getDocuments = async (req, res) => {
   }
 };
 
-// @desc    Get single document
-// @route   GET /api/documents/:id
-// @access  Private
 export const getDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -86,9 +113,6 @@ export const getDocument = async (req, res) => {
   }
 };
 
-// @desc    Update document details
-// @route   PUT /api/documents/:id
-// @access  Private
 export const updateDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -123,9 +147,6 @@ export const updateDocument = async (req, res) => {
   }
 };
 
-// @desc    Delete document
-// @route   DELETE /api/documents/:id
-// @access  Private
 export const deleteDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -151,24 +172,25 @@ export const deleteDocument = async (req, res) => {
   }
 };
 
-// @desc    Reprocess document (OCR stub)
-// @route   PATCH /api/documents/:id/reprocess
-// @access  Private
 export const reprocessDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
-
     if (!document) {
       return res.status(404).json({ message: "Document not found" });
     }
-
     if (document.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    // Placeholder for OCR logic
-    // In a real app, this would trigger a background job
-    res.json({ message: "Document queued for reprocessing" });
+    // Since we now have real logic, we can also add it here:
+    // 1. Download file from document.fileUrl (requires extra setup for FS)
+    // OR just return the message as before since the file is already on Cloudinary
+    // and Tesseract works best with local paths or public URLs.
+
+    // For now, we keep the original response to avoid complexity with downloading files
+    res.json({
+      message: "Reprocessing logic to be implemented via background job",
+    });
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }
