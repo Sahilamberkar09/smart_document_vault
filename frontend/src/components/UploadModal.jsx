@@ -1,143 +1,239 @@
 import { useState, useRef } from "react";
-import { CheckCircle, Upload, Tag, Loader2, X } from "lucide-react";
-import { apiRequest } from "../utils/api";
-import { useToast } from "../context/ToastContext";
+import { X, Upload, FileText } from "lucide-react";
+import api from "../api/client.js";
+import { useToast } from "../context/ToastContext.jsx";
 
-const UploadModal = ({ onClose, onSuccess }) => {
+const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [category, setCategory] = useState("");
-  const [fileError, setFileError] = useState("");
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Uncategorized");
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-  const { addToast } = useToast();
+  const { showToast } = useToast();
+
+  const categories = [
+    "Invoice",
+    "Receipt",
+    "Prescription",
+    "Report",
+    "Contract",
+    "Uncategorized",
+    "Other",
+  ];
+
+  if (!isOpen) return null;
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files[0];
+    validateAndSetFile(droppedFile);
+  };
+
+  const handleFileSelect = (e) => {
+    const selectedFile = e.target.files[0];
+    validateAndSetFile(selectedFile);
+  };
+
+  const validateAndSetFile = (file) => {
+    if (file) {
+      // Basic validation
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
+        showToast("File size too large (max 5MB)", "error");
+        return;
+      }
+      setFile(file);
+      // Auto-fill title with filename if empty
+      if (!title) {
+        setTitle(file.name.split(".")[0]);
+      }
+    }
+  };
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file || !title) {
+      showToast("Please select a file and provide a title", "error");
+      return;
+    }
 
-    setLoading(true);
     const formData = new FormData();
-    formData.append("file", file);
-    if (category) formData.append("category", category);
+    formData.append("document", file);
+    formData.append("title", title);
+    formData.append("category", category);
+
+    setUploading(true);
 
     try {
-      await apiRequest("/document/upload", "POST", formData, true);
-      addToast("Document uploaded successfully", "success");
-      onSuccess();
-    } catch (err) {
-      addToast(err.message || "Upload failed", "error");
+      await api.post("/documents/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      showToast("Document uploaded successfully!", "success");
+      onUploadSuccess();
+      handleClose();
+    } catch (error) {
+      console.error("Upload failed", error);
+      showToast(error.response?.data?.message || "Upload failed", "error");
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
-  const onDragOver = (e) => e.preventDefault();
-  const onDrop = (e) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-    }
+  const handleClose = () => {
+    setFile(null);
+    setTitle("");
+    setCategory("Uncategorized");
+    setUploading(false);
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-8 transform transition-all scale-100">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Upload Document</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fadeIn">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-800">Upload Document</h2>
           <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
+            onClick={handleClose}
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
           >
-            <X className="w-6 h-6" />
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleUpload} className="space-y-6">
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {/* Title Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Document Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. March Electricity Bill"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            />
+          </div>
+
+          {/* Category Select */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+            >
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Drag & Drop Area */}
           <div
-            className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-200 cursor-pointer group ${
-              file
-                ? "border-indigo-500 bg-indigo-50"
-                : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
-            }`}
-            onClick={() => fileInputRef.current.click()}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`
+              relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200
+              ${
+                isDragging
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
+              }
+              ${file ? "bg-green-50 border-green-200" : ""}
+            `}
           >
             <input
               type="file"
               ref={fileInputRef}
-              onChange={(e) => setFile(e.target.files[0])}
+              onChange={handleFileSelect}
               className="hidden"
+              //   accept=".pdf,.png,.jpg,.jpeg" // Optional constraint
             />
 
             {file ? (
-              <div className="flex flex-col items-center text-indigo-600 animate-in fade-in zoom-in">
-                <div className="bg-white p-3 rounded-full shadow-sm mb-3">
-                  <CheckCircle className="w-8 h-8 text-emerald-500" />
+              <div className="flex flex-col items-center animate-bounce-short">
+                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
+                  <FileText size={24} />
                 </div>
-                <p className="font-semibold text-lg">{file.name}</p>
-                <p className="text-sm text-indigo-400 mt-1">
+                <p className="text-sm font-semibold text-green-700 truncate max-w-[200px]">
+                  {file.name}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
                   {(file.size / 1024 / 1024).toFixed(2)} MB
                 </p>
                 <button
-                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setFile(null);
                   }}
-                  className="mt-4 text-xs text-red-500 hover:underline"
+                  className="mt-3 text-xs text-red-500 hover:text-red-700 underline"
                 >
-                  Remove file
+                  Remove
                 </button>
               </div>
             ) : (
-              <div className="text-gray-500 group-hover:text-indigo-500 transition-colors">
-                <div className="bg-gray-100 group-hover:bg-white p-4 rounded-full inline-block mb-4 transition-colors">
-                  <Upload className="w-8 h-8" />
+              <>
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3">
+                  <Upload size={24} />
                 </div>
-                <p className="font-semibold text-lg text-gray-700">
-                  Click or drag file to upload
+                <p className="text-sm font-medium text-gray-700">
+                  Click to upload or drag & drop
                 </p>
-                <p className="text-xs text-gray-400 mt-2">
-                  Supports JPG, PNG (OCR enabled) & PDF
+                <p className="text-xs text-gray-400 mt-1">
+                  PDF, JPG, PNG (Max 5MB)
                 </p>
-              </div>
+              </>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category (Optional)
-            </label>
-            <div className="relative">
-              <Tag className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-              <select
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition appearance-none cursor-pointer"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="">Auto Detect</option>
-                <option value="Passport">Passport</option>
-                <option value="Invoice">Invoice</option>
-                <option value="Licence">Licence</option>
-                <option value="Medical">Medical</option>
-                <option value="General">General</option>
-              </select>
-            </div>
-          </div>
-
+          {/* Action Button */}
           <button
-            type="submit"
-            disabled={loading || !file}
-            className="w-full py-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+            onClick={handleUpload}
+            disabled={uploading || !file || !title}
+            className={`w-full py-3 rounded-xl font-semibold text-white shadow-md transition-all flex items-center justify-center gap-2
+              ${
+                uploading || !file || !title
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-0.5"
+              }
+            `}
           >
-            {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
+            {uploading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Uploading...
+              </>
             ) : (
-              "Start Upload & Process"
+              <>
+                <Upload size={18} />
+                Upload Document
+              </>
             )}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

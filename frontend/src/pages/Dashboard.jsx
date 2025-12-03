@@ -166,7 +166,7 @@ const Dashboard = () => {
       {showUpload && (
         <UploadModal
           onClose={() => setShowUpload(false)}
-          onSuccess={() => {
+          onUploadSuccess={() => {
             setShowUpload(false);
             fetchDocs();
           }}
