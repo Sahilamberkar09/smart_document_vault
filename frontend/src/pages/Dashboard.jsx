@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Calendar, Tag, Plus, Search, Loader2 } from "lucide-react";
+import { FileText, Calendar, Tag, Plus, Search } from "lucide-react";
 import UploadModal from "../components/UploadModal";
 import StatCard from "../components/StatCard";
 import DocumentCard from "../components/DocumentCard";
@@ -165,6 +165,7 @@ const Dashboard = () => {
 
       {showUpload && (
         <UploadModal
+          isOpen={showUpload} // FIXED: Added missing prop here
           onClose={() => setShowUpload(false)}
           onUploadSuccess={() => {
             setShowUpload(false);

@@ -77,7 +77,8 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     setUploading(true);
 
     try {
-      await api.post("/documents/upload", formData, {
+      // Corrected Endpoint: /document/upload (Matches backend route)
+      await api.post("/document/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -102,7 +103,7 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fadeIn">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -170,7 +171,6 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
               ref={fileInputRef}
               onChange={handleFileSelect}
               className="hidden"
-              //   accept=".pdf,.png,.jpg,.jpeg" // Optional constraint
             />
 
             {file ? (
