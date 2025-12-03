@@ -10,7 +10,9 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-  const { showToast } = useToast();
+
+  // FIX 1: Use 'addToast' to match the context definition
+  const { addToast } = useToast();
 
   const categories = [
     "Invoice",
@@ -48,14 +50,12 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
   const validateAndSetFile = (file) => {
     if (file) {
-      // Basic validation
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        showToast("File size too large (max 5MB)", "error");
+        // FIX 2: Updated function name
+        addToast("File size too large (max 5MB)", "error");
         return;
       }
       setFile(file);
-      // Auto-fill title with filename if empty
       if (!title) {
         setTitle(file.name.split(".")[0]);
       }
@@ -65,7 +65,8 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file || !title) {
-      showToast("Please select a file and provide a title", "error");
+      // FIX 3: Updated function name
+      addToast("Please select a file and provide a title", "error");
       return;
     }
 
@@ -77,20 +78,27 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     setUploading(true);
 
     try {
-      // Corrected Endpoint: /document/upload (Matches backend route)
       await api.post("/document/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
-      showToast("Document uploaded successfully!", "success");
-      onUploadSuccess();
-      handleClose();
+
+      // FIX 4: Updated function name
+      addToast("Document uploaded successfully!", "success");
+
+      if (onUploadSuccess) {
+        onUploadSuccess(); // This unmounts the modal
+      }
+
+      // FIX 5: Removed handleClose() and finally block here
+      // Reason: The modal is already unmounted by onUploadSuccess,
+      // so we shouldn't try to update state (setUploading) afterwards.
     } catch (error) {
       console.error("Upload failed", error);
-      showToast(error.response?.data?.message || "Upload failed", "error");
-    } finally {
-      setUploading(false);
+      // FIX 6: Updated function name
+      addToast(error.response?.data?.message || "Upload failed", "error");
+      setUploading(false); // Only stop loading if upload FAILED and modal is still open
     }
   };
 
@@ -118,7 +126,6 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          {/* Title Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Document Title
@@ -132,7 +139,6 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
             />
           </div>
 
-          {/* Category Select */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Category
@@ -150,7 +156,6 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
             </select>
           </div>
 
-          {/* Drag & Drop Area */}
           <div
             onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
@@ -209,7 +214,6 @@ const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
             )}
           </div>
 
-          {/* Action Button */}
           <button
             onClick={handleUpload}
             disabled={uploading || !file || !title}

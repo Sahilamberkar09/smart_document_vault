@@ -87,7 +87,7 @@ const DocumentCard = ({ doc, onDelete }) => {
       </div>
 
       {/* Content Info */}
-      <div className="p-4 flex flex-col flex-grow">
+      <div className="p-4 flex flex-col grow">
         <h3
           className="font-semibold text-gray-800 text-lg leading-tight truncate mb-1"
           title={doc.title}
