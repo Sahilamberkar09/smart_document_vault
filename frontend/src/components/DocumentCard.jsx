@@ -1,12 +1,9 @@
 import React from "react";
 import { FileText, Trash2, Calendar, Eye } from "lucide-react";
-import { useToast } from "../context/ToastContext.jsx";
-import api from "../api/client.js";
 
 const DocumentCard = ({ doc, onDelete }) => {
-  const { showToast } = useToast();
-
   // Helper to determine if file is an image based on MIME type
+  // Safe use of optional chaining handled here
   const isImage = doc.fileType?.startsWith("image/");
 
   // Format date safely
@@ -16,16 +13,8 @@ const DocumentCard = ({ doc, onDelete }) => {
     day: "numeric",
   });
 
-  const handleDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete "${doc.title}"?`)) {
-      try {
-        await api.delete(`/documents/${doc._id}`);
-        onDelete(doc._id);
-        showToast("Document deleted", "success");
-      } catch (error) {
-        showToast("Failed to delete document", "error");
-      }
-    }
+  const handleDelete = () => {
+    onDelete(doc._id);
   };
 
   const getCategoryColor = (cat) => {
@@ -50,7 +39,7 @@ const DocumentCard = ({ doc, onDelete }) => {
             alt={doc.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={(e) => {
-              e.target.onerror = null; // Prevent infinite loop
+              e.target.onerror = null;
               e.target.parentElement.innerHTML =
                 '<div class="text-gray-400 flex flex-col items-center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg><span class="text-xs mt-2">Preview Unavailable</span></div>';
             }}
@@ -58,9 +47,12 @@ const DocumentCard = ({ doc, onDelete }) => {
         ) : (
           <div className="flex flex-col items-center text-gray-400 group-hover:text-blue-500 transition-colors">
             <FileText size={56} strokeWidth={1.5} />
+
+            {/* --- FIX APPLIED BELOW --- */}
             <span className="text-xs font-medium mt-2 uppercase tracking-wide text-gray-500">
-              {doc.fileType.split("/")[1] || "PDF"}
+              {doc.fileType ? doc.fileType.split("/")[1] : "DOC"}
             </span>
+            {/* ------------------------- */}
           </div>
         )}
 
@@ -90,7 +82,7 @@ const DocumentCard = ({ doc, onDelete }) => {
             doc.category
           )}`}
         >
-          {doc.category}
+          {doc.category || "Uncategorized"}
         </div>
       </div>
 
@@ -100,7 +92,7 @@ const DocumentCard = ({ doc, onDelete }) => {
           className="font-semibold text-gray-800 text-lg leading-tight truncate mb-1"
           title={doc.title}
         >
-          {doc.title}
+          {doc.title || "Untitled Document"}
         </h3>
 
         <div className="flex items-center text-xs text-gray-500 mb-4 space-x-2">
@@ -109,7 +101,8 @@ const DocumentCard = ({ doc, onDelete }) => {
             {formattedDate}
           </span>
           <span>•</span>
-          <span>{(doc.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+          {/* Safe division in case fileSize is missing */}
+          <span>{((doc.fileSize || 0) / 1024 / 1024).toFixed(2)} MB</span>
         </div>
 
         {/* Tags or Status (Optional) */}
