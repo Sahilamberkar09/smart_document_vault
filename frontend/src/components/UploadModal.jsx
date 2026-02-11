@@ -1,241 +1,167 @@
-import { useState, useRef } from "react";
-import { X, Upload, FileText } from "lucide-react";
-import api from "../api/client.js";
-import { useToast } from "../context/ToastContext.jsx";
+import React, { useState } from "react";
+import { X, Upload, File as FileIcon } from "lucide-react";
+import api from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 const UploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Uncategorized");
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  // FIX 1: Use 'addToast' to match the context definition
+  const [category, setCategory] = useState("Personal");
+  const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
-  const categories = [
-    "Auto-Detect", // Renamed from Uncategorized
-    "Aadhaar", // Added new types
-    "PAN",
-    "Voter ID",
-    "Invoice",
-    "Receipt",
-    "Prescription",
-    "Report",
-    "Contract",
-    "Academic",
-    "Other",
-  ];
 
   if (!isOpen) return null;
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFile = e.dataTransfer.files[0];
-    validateAndSetFile(droppedFile);
-  };
-
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files[0];
-    validateAndSetFile(selectedFile);
-  };
-
-  const validateAndSetFile = (file) => {
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // FIX 2: Updated function name
-        addToast("File size too large (max 5MB)", "error");
-        return;
-      }
-      setFile(file);
-      if (!title) {
-        setTitle(file.name.split(".")[0]);
-      }
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
-  const handleUpload = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file || !title) {
-      addToast("Please select a file and provide a title", "error");
+      addToast("Please select a file and enter a title", "error");
       return;
     }
 
-    // Map "Auto-Detect" back to "Uncategorized" for the backend logic
-    const finalCategory =
-      category === "Auto-Detect" ? "Uncategorized" : category;
-
+    // --- KEY FIX STARTS HERE ---
+    // 1. Create a FormData instance
     const formData = new FormData();
-    formData.append("document", file);
-    formData.append("title", title);
-    formData.append("category", finalCategory);
 
-    setUploading(true);
+    // 2. Append fields exactly as the backend expects them
+    formData.append("file", file);
+    formData.append("title", title);
+    formData.append("category", category);
+
+    setLoading(true);
 
     try {
-      // FIX: Removed the manual 'headers' object.
-      // Axios detects FormData and automatically sets the correct Content-Type with boundary.
-      await api.post("/document/upload", formData);
+      // 3. Send the formData directly.
+      // Do NOT set 'Content-Type': 'multipart/form-data' manually.
+      // Do NOT send a plain object like { file, title }.
+      const response = await api.post("/document/upload", formData);
 
-      addToast("Document uploaded successfully!", "success");
+      addToast("Document uploaded successfully", "success");
 
       if (onUploadSuccess) {
-        onUploadSuccess();
+        onUploadSuccess(response.data);
       }
+
+      // Reset form
+      setFile(null);
+      setTitle("");
+      setCategory("Personal");
+      onClose();
     } catch (error) {
       console.error("Upload failed", error);
-      addToast(error.response?.data?.message || "Upload failed", "error");
-      setUploading(false);
+      const errorMessage =
+        error.response?.data?.message || "Failed to upload document";
+      addToast(errorMessage, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setFile(null);
-    setTitle("");
-    setCategory("Uncategorized");
-    setUploading(false);
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fadeIn">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-800">Upload Document</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+          <h3 className="font-bold text-gray-900">Upload Document</h3>
           <button
-            onClick={handleClose}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X size={20} />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
               Document Title
             </label>
             <input
               type="text"
+              className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all"
+              placeholder="e.g., Insurance Policy"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. March Electricity Bill"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
               Category
             </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+            <div className="relative">
+              <select
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none appearance-none bg-white"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="Personal">Personal</option>
+                <option value="Work">Work</option>
+                <option value="Finance">Finance</option>
+                <option value="Legal">Legal</option>
+                <option value="Health">Health</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-700">File</label>
+            <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                accept=".pdf,.png,.jpg,.jpeg"
+              />
+              {file ? (
+                <div className="flex items-center justify-center gap-2 text-indigo-600">
+                  <FileIcon className="w-5 h-5" />
+                  <span className="text-sm font-medium truncate max-w-[200px]">
+                    {file.name}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    <span className="text-indigo-600 font-medium">
+                      Click to upload
+                    </span>{" "}
+                    or drag and drop
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    PDF, PNG, JPG up to 10MB
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
             >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !file || !title}
+              className="px-4 py-2 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Uploading..." : "Upload Document"}
+            </button>
           </div>
-
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`
-              relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200
-              ${
-                isDragging
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-              }
-              ${file ? "bg-green-50 border-green-200" : ""}
-            `}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-
-            {file ? (
-              <div className="flex flex-col items-center animate-bounce-short">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
-                  <FileText size={24} />
-                </div>
-                <p className="text-sm font-semibold text-green-700 truncate max-w-[200px]">
-                  {file.name}
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFile(null);
-                  }}
-                  className="mt-3 text-xs text-red-500 hover:text-red-700 underline"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3">
-                  <Upload size={24} />
-                </div>
-                <p className="text-sm font-medium text-gray-700">
-                  Click to upload or drag & drop
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  PDF, JPG, PNG (Max 5MB)
-                </p>
-              </>
-            )}
-          </div>
-
-          <button
-            onClick={handleUpload}
-            disabled={uploading || !file || !title}
-            className={`w-full py-3 rounded-xl font-semibold text-white shadow-md transition-all flex items-center justify-center gap-2
-              ${
-                uploading || !file || !title
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-0.5"
-              }
-            `}
-          >
-            {uploading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload size={18} />
-                Upload Document
-              </>
-            )}
-          </button>
-        </div>
+        </form>
       </div>
     </div>
   );
