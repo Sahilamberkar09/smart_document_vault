@@ -182,16 +182,35 @@ export const reprocessDocument = async (req, res) => {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    // Since we now have real logic, we can also add it here:
-    // 1. Download file from document.fileUrl (requires extra setup for FS)
-    // OR just return the message as before since the file is already on Cloudinary
-    // and Tesseract works best with local paths or public URLs.
+    console.log(
+      `Starting reprocessing for document: ${document.title} (${document._id})`,
+    );
 
-    // For now, we keep the original response to avoid complexity with downloading files
-    res.json({
-      message: "Reprocessing logic to be implemented via background job",
-    });
+    // Perform OCR on the file URL (Cloudinary URL)
+    let ocrText = "";
+    try {
+      ocrText = await extractTextFromImage(document.fileUrl);
+    } catch (err) {
+      console.error("OCR Reprocessing Failed:", err);
+      return res.status(500).json({ message: "OCR Reprocessing Failed" });
+    }
+
+    // Update the document with new OCR text
+    document.ocrText = ocrText;
+
+    // Optional: Re-categorize if currently "Uncategorized"
+    if (document.category === "Uncategorized") {
+      const newCategory = categorizeDocument(ocrText);
+      if (newCategory !== "Uncategorized") {
+        document.category = newCategory;
+      }
+    }
+
+    await document.save();
+
+    res.json(document);
   } catch (error) {
+    console.error("Reprocessing error:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
